@@ -445,7 +445,8 @@ module Vortex import VX_gpu_pkg::*, VX_trace_pkg::*, VX_tlb_pkg::*; (
     for (genvar cluster_id = 0; cluster_id < `VX_CFG_NUM_CLUSTERS; ++cluster_id) begin : g_clusters
 
         VX_cluster #(
-            .INSTANCE_ID (`SFORMATF(("cluster%0d", cluster_id)))
+            .INSTANCE_ID (`SFORMATF(("cluster%0d", cluster_id))),
+            .CORE_BASE   (cluster_id * `VX_CFG_NUM_CORES)
         ) cluster (
             `SCOPE_IO_BIND (scope_cluster + cluster_id)
 

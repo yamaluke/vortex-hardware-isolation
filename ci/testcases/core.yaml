@@ -125,6 +125,16 @@ tests:
 # check: model_parity — SimX vs rtlsim, same app/args/configs on both drivers
 # ---------------------------------------------------------------------------
 
+# Two CTAs are assigned to the normal and secure worlds by blockIdx.x parity.
+# The secure-core mask makes core 0 normal and core 1 secure.
+- id: parity-world-isolation
+  check: model_parity
+  via: blackbox
+  app: world_isolation
+  configs: -DVX_CFG_TWO_WORLD_ENABLE -DVX_CFG_SECURE_CORE_MASK=2
+  shape:
+    cores: 2
+
 # ALU/LSU/branch streaming pipeline (~314k cycles on the default 1-core shape).
 - id: parity-vecadd
   check: model_parity

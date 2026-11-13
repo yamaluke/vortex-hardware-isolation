@@ -154,6 +154,7 @@ module VX_raster_launch import VX_gpu_pkg::*, VX_raster_pkg::*; #(
     assign kmu_bus_if.kind  = frag_req.kind;
     assign kmu_bus_if.eop   = 1'b1;
     assign kmu_bus_if.dest  = KMU_DEST_W'(owner_r);
+    assign kmu_bus_if.core_mask = {KMU_CORE_MASK_W{1'b1}};
     assign kmu_bus_if.data  = KMU_DATAW'(frag_req);
 
     wire out_fire = kmu_bus_if.valid && kmu_bus_if.ready;

@@ -37,6 +37,7 @@ module VX_kmu_bus_arb import VX_gpu_pkg::*; #(
     parameter NUM_INPUTS  = 1,
     parameter NUM_OUTPUTS = 1,
     parameter DEST_DIV    = 1,   // cores below each output: this level's digit of `dest`
+    parameter CORE_BASE   = 0,   // global index of this router's first core
     parameter OUT_BUF     = 0,
     parameter `STRING ARBITER = "R"
 ) (
@@ -59,17 +60,18 @@ module VX_kmu_bus_arb import VX_gpu_pkg::*; #(
     `STATIC_ASSERT((NUM_INPUTS == 1) || (NUM_OUTPUTS == 1),
         ("VX_kmu_bus_arb is single-stage (N->1 or 1->M); compose two for N->M"))
 
-    // packed beat: {kind, eop, dest, data}
-    localparam PW    = 1 + 1 + KMU_DEST_W + KMU_DATAW;
+    // packed beat: {kind, eop, dest, core_mask, data}
+    localparam PW    = 1 + 1 + KMU_DEST_W + KMU_CORE_MASK_W + KMU_DATAW;
     localparam LOG_I = `CLOG2(NUM_INPUTS);
     localparam LOG_O = `CLOG2(NUM_OUTPUTS);
     localparam SEL_I = `UP(LOG_I);
     localparam SEL_O = `UP(LOG_O);
 
     // field offsets within a packed beat
-    localparam PW_DEST = KMU_DATAW;
-    localparam PW_EOP  = KMU_DATAW + KMU_DEST_W;
-    localparam PW_KIND = KMU_DATAW + KMU_DEST_W + 1;
+    localparam PW_MASK = KMU_DATAW;
+    localparam PW_DEST = KMU_DATAW + KMU_CORE_MASK_W;
+    localparam PW_EOP  = KMU_DATAW + KMU_CORE_MASK_W + KMU_DEST_W;
+    localparam PW_KIND = KMU_DATAW + KMU_CORE_MASK_W + KMU_DEST_W + 1;
 
     wire [NUM_INPUTS-1:0]           bus_valid;
     wire [NUM_INPUTS-1:0][PW-1:0]   bus_data;
@@ -84,6 +86,7 @@ module VX_kmu_bus_arb import VX_gpu_pkg::*; #(
         assign bus_data[i]  = {bus_in_if[i].kind,
                                bus_in_if[i].eop,
                                bus_in_if[i].dest,
+                               bus_in_if[i].core_mask,
                                bus_in_if[i].data};
         assign bus_in_if[i].ready = bus_ready[i];
     end
@@ -169,16 +172,33 @@ module VX_kmu_bus_arb import VX_gpu_pkg::*; #(
 
         wire [SEL_O-1:0] dest_sel = SEL_O'((32'(m_data[PW_DEST +: KMU_DEST_W]) / DEST_DIV) % NUM_OUTPUTS);
 
-        // Round-robin over the ready outputs, starting at rr_ptr. Descending
-        // scan so the nearest ready output (smallest step from rr_ptr) is the
-        // last assignment and therefore wins.
+        // A compute message may only enter a subtree containing an eligible
+        // core. DEST_DIV is the number of contiguous global cores beneath one
+        // output at this hierarchy level.
+        wire [KMU_CORE_MASK_W-1:0] core_mask = m_data[PW_MASK +: KMU_CORE_MASK_W];
+        wire [NUM_OUTPUTS-1:0] eligible_out;
+        for (genvar o = 0; o < NUM_OUTPUTS; ++o) begin : g_eligible
+            logic eligible;
+            always_comb begin
+                eligible = 1'b0;
+                for (integer c = 0; c < DEST_DIV; ++c) begin
+                    if ((CORE_BASE + o * DEST_DIV + c) < KMU_CORE_MASK_W)
+                        eligible |= core_mask[CORE_BASE + o * DEST_DIV + c];
+                end
+            end
+            assign eligible_out[o] = eligible;
+        end
+        wire [NUM_OUTPUTS-1:0] compute_ready = out_ready & eligible_out;
+
+        // Round-robin over eligible ready outputs, starting at rr_ptr.
+        // Descending scan makes the nearest ready output win.
         reg [SEL_O-1:0] rr_sel;
         always @(*) begin
             rr_sel = rr_ptr;
             for (integer k = NUM_OUTPUTS - 1; k >= 0; --k) begin
                 automatic logic [SEL_O-1:0] idx =
                     SEL_O'((32'(rr_ptr) + k) % NUM_OUTPUTS);
-                if (out_ready[idx]) begin
+                if (compute_ready[idx]) begin
                     rr_sel = idx;
                 end
             end
@@ -192,7 +212,10 @@ module VX_kmu_bus_arb import VX_gpu_pkg::*; #(
             assign out_valid[o] = m_valid && (sel == SEL_O'(o));
             assign out_data[o]  = m_data;
         end
-        assign m_ready = out_ready[sel];
+        wire compute_ready_any = |compute_ready;
+        assign m_ready = (m_data[PW_KIND] == KMU_KIND_FRAGMENT)
+                       ? out_ready[sel]
+                       : (compute_ready_any && out_ready[sel]);
 
         wire m_fire = m_valid && m_ready;
         wire [SEL_O-1:0] rr_next = (sel == SEL_O'(NUM_OUTPUTS - 1)) ? '0 : (sel + SEL_O'(1));
@@ -216,7 +239,9 @@ module VX_kmu_bus_arb import VX_gpu_pkg::*; #(
         `UNUSED_PARAM (DEST_DIV)
         assign out_valid[0] = m_valid;
         assign out_data[0]  = m_data;
-        assign m_ready      = out_ready[0];
+        assign m_ready      = out_ready[0]
+                           && ((m_data[PW_KIND] == KMU_KIND_FRAGMENT)
+                            || (|m_data[PW_MASK +: KMU_CORE_MASK_W]));
 
     end
 
@@ -245,6 +270,7 @@ module VX_kmu_bus_arb import VX_gpu_pkg::*; #(
         assign bus_out_if[o].kind = buf_data[PW_KIND];
         assign bus_out_if[o].eop  = buf_data[PW_EOP];
         assign bus_out_if[o].dest = buf_data[PW_DEST +: KMU_DEST_W];
+        assign bus_out_if[o].core_mask = buf_data[PW_MASK +: KMU_CORE_MASK_W];
         assign bus_out_if[o].data = buf_data[KMU_DATAW-1:0];
     end
 

@@ -86,6 +86,7 @@ module VX_raster_core_top import VX_gpu_pkg::*; import VX_raster_pkg::*; #(
     `UNUSED_VAR (kmu_bus_if.kind)
     `UNUSED_VAR (kmu_bus_if.eop)
     `UNUSED_VAR (kmu_bus_if.dest)
+    `UNUSED_VAR (kmu_bus_if.core_mask)
 
     VX_mem_bus_if #(
         .DATA_SIZE (RCACHE_WORD_SIZE),

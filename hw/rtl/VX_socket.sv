@@ -18,7 +18,8 @@ module VX_socket import VX_gpu_pkg::*, VX_tlb_pkg::*;
     import VX_dxa_pkg::*;
 `endif
 #(
-    parameter `STRING INSTANCE_ID = ""
+    parameter `STRING INSTANCE_ID = "",
+    parameter CORE_BASE = 0
 ) (
     `SCOPE_IO_DECL
 
@@ -79,6 +80,7 @@ module VX_socket import VX_gpu_pkg::*, VX_tlb_pkg::*;
         .NUM_INPUTS (1),
         .NUM_OUTPUTS (`VX_CFG_SOCKET_SIZE),
         .DEST_DIV   (KMU_DEST_DIV_SOCKET),
+        .CORE_BASE  (CORE_BASE),
         .OUT_BUF    ((`VX_CFG_SOCKET_SIZE > 1) ? 3 : 0)
     ) kmu_arb (
         .clk        (clk),

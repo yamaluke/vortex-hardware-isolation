@@ -15,7 +15,8 @@
 
 module VX_cluster import VX_gpu_pkg::*, VX_tlb_pkg::*;
 #(
-    parameter `STRING INSTANCE_ID = ""
+    parameter `STRING INSTANCE_ID = "",
+    parameter CORE_BASE = 0
 ) (
     `SCOPE_IO_DECL
 
@@ -118,6 +119,7 @@ module VX_cluster import VX_gpu_pkg::*, VX_tlb_pkg::*;
     assign kmu_arb_in_if[0].kind  = kmu_bus_if[0].kind;
     assign kmu_arb_in_if[0].eop   = kmu_bus_if[0].eop;
     assign kmu_arb_in_if[0].dest  = kmu_bus_if[0].dest;
+    assign kmu_arb_in_if[0].core_mask = kmu_bus_if[0].core_mask;
     assign kmu_bus_if[0].ready    = kmu_arb_in_if[0].ready;
 
     assign kmu_arb_in_if[1].valid = raster_kmu_bus_if[0].valid;
@@ -125,6 +127,7 @@ module VX_cluster import VX_gpu_pkg::*, VX_tlb_pkg::*;
     assign kmu_arb_in_if[1].kind  = raster_kmu_bus_if[0].kind;
     assign kmu_arb_in_if[1].eop   = raster_kmu_bus_if[0].eop;
     assign kmu_arb_in_if[1].dest  = raster_kmu_bus_if[0].dest;
+    assign kmu_arb_in_if[1].core_mask = raster_kmu_bus_if[0].core_mask;
     assign raster_kmu_bus_if[0].ready = kmu_arb_in_if[1].ready;
 
     // Merge {compute, raster} onto one launch stream (fan-in message lock), then
@@ -150,6 +153,7 @@ module VX_cluster import VX_gpu_pkg::*, VX_tlb_pkg::*;
         .NUM_INPUTS  (1),
         .NUM_OUTPUTS (NUM_SOCKETS),
         .DEST_DIV    (KMU_DEST_DIV_CLUSTER),
+        .CORE_BASE   (CORE_BASE),
         .OUT_BUF     ((NUM_SOCKETS > 1) ? 3 : 0)
     ) kmu_dist (
         .clk        (clk),
@@ -162,6 +166,7 @@ module VX_cluster import VX_gpu_pkg::*, VX_tlb_pkg::*;
         .NUM_INPUTS (1),
         .NUM_OUTPUTS (NUM_SOCKETS),
         .DEST_DIV   (KMU_DEST_DIV_CLUSTER),
+        .CORE_BASE  (CORE_BASE),
         .OUT_BUF    ((NUM_SOCKETS > 1) ? 3 : 0)
     ) kmu_arb (
         .clk        (clk),
@@ -430,7 +435,8 @@ module VX_cluster import VX_gpu_pkg::*, VX_tlb_pkg::*;
     for (genvar socket_id = 0; socket_id < NUM_SOCKETS; ++socket_id) begin : g_sockets
 
         VX_socket #(
-            .INSTANCE_ID (`SFORMATF(("%s-socket%0d", INSTANCE_ID, socket_id)))
+            .INSTANCE_ID (`SFORMATF(("%s-socket%0d", INSTANCE_ID, socket_id))),
+            .CORE_BASE   (CORE_BASE + socket_id * `VX_CFG_SOCKET_SIZE)
         ) socket (
             `SCOPE_IO_BIND  (scope_socket+socket_id)
 

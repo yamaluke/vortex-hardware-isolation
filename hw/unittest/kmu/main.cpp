@@ -18,6 +18,13 @@
 #include "VX_types.h"
 #include <cassert>
 
+#define CHECK(expr) do { \
+  if (!(expr)) { \
+    std::cerr << "check failed: " << #expr << std::endl; \
+    return 1; \
+  } \
+} while (0)
+
 #ifndef TRACE_START_TIME
 #define TRACE_START_TIME 0ull
 #endif
@@ -92,8 +99,23 @@ int main(int argc, char **argv) {
   tick = sim.step(tick, 2);
   sim->start = 0;
 
-  // Run enough cycles to observe full CTA dispatch
-  tick = sim.step(tick, 200);
+  bool seen_core0[3] = {};
+  bool seen_core1[3] = {};
+  for (uint32_t i = 0; i < 200; ++i) {
+    tick = sim.step(tick, 2);
+    if (sim->core0_valid) {
+      CHECK((sim->core0_block_x & 1) == 0);
+      CHECK(sim->core0_mask == 0x1);
+      seen_core0[sim->core0_block_x] = true;
+    }
+    if (sim->core1_valid) {
+      CHECK((sim->core1_block_x & 1) == 1);
+      CHECK(sim->core1_mask == 0x2);
+      seen_core1[sim->core1_block_x] = true;
+    }
+  }
+  CHECK(seen_core0[0] && seen_core0[2]);
+  CHECK(seen_core1[1]);
 
   return 0;
 }

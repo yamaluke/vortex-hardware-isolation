@@ -103,6 +103,11 @@ module VX_kmu import VX_gpu_pkg::*; import VX_trace_pkg::*; #(
     end
 
     wire kmu_bus_if_fire = kmu_bus_if.valid && kmu_bus_if.ready;
+    localparam [KMU_CORE_MASK_W-1:0] SECURE_CORE_MASK = KMU_CORE_MASK_W'(`VX_CFG_SECURE_CORE_MASK);
+    localparam [KMU_CORE_MASK_W-1:0] NORMAL_CORE_MASK = ~SECURE_CORE_MASK;
+
+    `STATIC_ASSERT(!`VX_CFG_TWO_WORLD_ENABLED || ((|SECURE_CORE_MASK) && (|NORMAL_CORE_MASK)),
+        ("two-world isolation requires at least one core in each world"))
 
     // DCR write logic
     always_ff @(posedge clk) begin
@@ -175,6 +180,10 @@ module VX_kmu import VX_gpu_pkg::*; import VX_trace_pkg::*; #(
     wire grid_nonempty = (dcr_grid_dim[0] != 0)
                       && (dcr_grid_dim[1] != 0)
                       && (dcr_grid_dim[2] != 0);
+    wire isolation_cluster_valid = (dcr_cluster_dim[0] == (NW_WIDTH+1)'(1));
+
+    `RUNTIME_ASSERT(~(start && `VX_CFG_TWO_WORLD_ENABLED && !isolation_cluster_valid),
+        ("%t: %s: two-world isolation requires cluster_dim.x == 1", $time, INSTANCE_ID))
 
     // Delegated draw launch: a grid-less start is forwarded to the raster
     // engines over the launch interface. raster_start_r holds `busy` from
@@ -248,7 +257,7 @@ module VX_kmu import VX_gpu_pkg::*; import VX_trace_pkg::*; #(
             block_idx_r <= '0;
             is_first_r  <= 1'b0;
         end else if (start) begin
-            running   <= grid_nonempty;
+            running   <= grid_nonempty && (!`VX_CFG_TWO_WORLD_ENABLED || isolation_cluster_valid);
             cta_id    <= 0;
             group_origin <= '0;
             intra_offset <= '0;
@@ -367,6 +376,9 @@ module VX_kmu import VX_gpu_pkg::*; import VX_trace_pkg::*; #(
     assign kmu_bus_if.kind  = kmu_req.kind;
     assign kmu_bus_if.eop   = is_last_r;
     assign kmu_bus_if.dest  = '0;
+    assign kmu_bus_if.core_mask = `VX_CFG_TWO_WORLD_ENABLED
+        ? (block_idx_r[0][0] ? SECURE_CORE_MASK : NORMAL_CORE_MASK)
+        : {KMU_CORE_MASK_W{1'b1}};
 
     assign busy = running | raster_start_r;
 

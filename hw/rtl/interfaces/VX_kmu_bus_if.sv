@@ -38,13 +38,15 @@
 // is bin->core affine — that affinity is what keeps same-pixel blend order
 // correct — so a fragment message cannot be load-balanced the way a compute CTA
 // can. Each fan-out level consumes its own digit of `dest` (KMU_DEST_DIV_*);
-// compute launches ignore it and go to any ready output.
+// Compute messages carry core_mask. A set bit names a global core eligible to
+// receive the whole message; the router selects only eligible ready outputs.
 
 interface VX_kmu_bus_if import VX_gpu_pkg::*; ();
     logic                   valid;
     logic                   kind;   // KMU_KIND_COMPUTE | KMU_KIND_FRAGMENT
     logic                   eop;    // last beat of the message
     logic [KMU_DEST_W-1:0]  dest;   // placement hint (fragment only)
+    logic [KMU_CORE_MASK_W-1:0] core_mask;
     logic [KMU_DATAW-1:0]   data;   // beat 0 = kmu_req_t; payload beats = packed stamps
     logic                   ready;
 
@@ -53,6 +55,7 @@ interface VX_kmu_bus_if import VX_gpu_pkg::*; ();
         output kind,
         output eop,
         output dest,
+        output core_mask,
         output data,
         input  ready
     );
@@ -62,6 +65,7 @@ interface VX_kmu_bus_if import VX_gpu_pkg::*; ();
         input  kind,
         input  eop,
         input  dest,
+        input  core_mask,
         input  data,
         output ready
     );

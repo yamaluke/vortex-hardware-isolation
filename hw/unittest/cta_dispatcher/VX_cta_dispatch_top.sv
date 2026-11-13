@@ -91,6 +91,7 @@ module VX_cta_dispatch_top import VX_gpu_pkg::*;
     assign kmu_bus.kind  = KMU_KIND_COMPUTE;
     assign kmu_bus.eop   = 1'b1;
     assign kmu_bus.dest  = '0;
+    assign kmu_bus.core_mask = {KMU_CORE_MASK_W{1'b1}};
     assign kmu_bus.data  = kmu_req;
     assign task_in_ready = kmu_bus.ready;
     `UNUSED_VAR (in_cta_id)

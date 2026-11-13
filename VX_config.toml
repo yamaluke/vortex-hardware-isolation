@@ -4,6 +4,11 @@
 VX_CFG_NUM_CLUSTERS = 1
 VX_CFG_NUM_CORES = 1
 VX_CFG_SOCKET_SIZE = 1
+# Two-world isolation is opt-in so the default single-core configuration keeps
+# its existing scheduling behavior. Bit i of the mask names global core i;
+# one is secure and zero is normal.
+VX_CFG_TWO_WORLD_ENABLE = false
+VX_CFG_SECURE_CORE_MASK = 2
 
 VX_CFG_RESET_DELAY = 8
 

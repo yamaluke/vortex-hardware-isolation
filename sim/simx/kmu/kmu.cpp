@@ -13,6 +13,7 @@
 
 #include "kmu.h"
 #include <cassert>
+#include <cstdlib>
 
 using namespace vortex;
 
@@ -33,6 +34,8 @@ Kmu::Kmu(const SimContext& ctx, const char* name, uint32_t num_cores)
   , cluster_core_(0)
   , inflight_(num_cores, 0)
 {
+  static_assert(VX_CFG_NUM_CLUSTERS * VX_CFG_NUM_CORES <= 64,
+                "two-world core mask supports at most 64 cores");
   block_dim_[0]    = block_dim_[1]    = block_dim_[2]    = 1;
   grid_dim_[0]     = grid_dim_[1]     = grid_dim_[2]     = 1;
   cluster_dim_[0]  = cluster_dim_[1]  = cluster_dim_[2]  = 1;
@@ -87,6 +90,15 @@ void Kmu::dcr_write(uint32_t addr, uint32_t value) {
 }
 
 void Kmu::start() {
+#if VX_CFG_TWO_WORLD_ENABLED
+  const uint64_t all_cores = (bus_out.size() == 64)
+      ? ~uint64_t(0)
+      : ((uint64_t(1) << bus_out.size()) - 1);
+  const uint64_t secure_cores = uint64_t(VX_CFG_SECURE_CORE_MASK) & all_cores;
+  if (secure_cores == 0 || secure_cores == all_cores || cluster_dim_[0] != 1) {
+    std::abort();
+  }
+#endif
   running_ = (block_size_ > 0)
            && (grid_dim_[0] > 0)
            && (grid_dim_[1] > 0)
@@ -127,7 +139,9 @@ void Kmu::on_tick() {
   // transport has room and the core holds fewer than LAUNCH_CREDITS CTAs it
   // has not yet admitted.
   auto lane_ready = [&](uint32_t c) {
-    return !bus_out.at(c).full() && inflight_[c] < LAUNCH_CREDITS;
+    return !bus_out.at(c).full()
+        && inflight_[c] < LAUNCH_CREDITS
+        && (!VX_CFG_TWO_WORLD_ENABLED || core_is_secure(c) == cta_is_secure());
   };
   uint32_t target = num_cores;
   if (cluster_locked_) {
@@ -155,6 +169,14 @@ void Kmu::on_tick() {
     // Message complete: advance past the granted core.
     rr_ptr_ = (target + 1) % num_cores;
   }
+}
+
+bool Kmu::cta_is_secure() const {
+  return ((group_origin_[0] + intra_offset_[0]) & 1) != 0;
+}
+
+bool Kmu::core_is_secure(uint32_t core_id) const {
+  return ((uint64_t(VX_CFG_SECURE_CORE_MASK) >> core_id) & 1) != 0;
 }
 
 bool Kmu::next_cta(kmu_req_t* req, uint32_t core_id) {

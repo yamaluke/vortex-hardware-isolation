@@ -1247,6 +1247,7 @@ package VX_gpu_pkg;
     // `UP` so a single-core build still has a 1-bit (unused) hint rather than a
     // zero-width vector.
     localparam KMU_DEST_W = `UP(`CLOG2(`VX_CFG_NUM_CLUSTERS * `VX_CFG_NUM_CORES));
+    localparam KMU_CORE_MASK_W = `VX_CFG_NUM_CLUSTERS * `VX_CFG_NUM_CORES;
 
     localparam KMU_DEST_DIV_SOCKET  = 1;
     localparam KMU_DEST_DIV_CLUSTER = `VX_CFG_SOCKET_SIZE;

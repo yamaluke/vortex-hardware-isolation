@@ -88,6 +88,8 @@ private:
   // exhausted. The caller steers: a locked cluster's members all target the
   // owning core.
   bool next_cta(kmu_req_t* req, uint32_t core_id);
+  bool cta_is_secure() const;
+  bool core_is_secure(uint32_t core_id) const;
 
   uint64_t PC_;
   uint64_t entry_;

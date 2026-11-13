@@ -149,6 +149,7 @@ module VX_core_top import VX_gpu_pkg::*;
     assign kmu_bus_if.kind  = kmu_kind;
     assign kmu_bus_if.eop   = kmu_eop;
     assign kmu_bus_if.dest  = kmu_dest;
+    assign kmu_bus_if.core_mask = {KMU_CORE_MASK_W{1'b1}};
     assign kmu_bus_if.data  = kmu_data;
     assign kmu_ready        = kmu_bus_if.ready;
 

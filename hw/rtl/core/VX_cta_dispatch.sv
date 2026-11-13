@@ -186,6 +186,7 @@ module VX_cta_dispatch import VX_gpu_pkg::*; #(
     assign kmu_req = kmu_req_t'(kmu_bus_if.data);
     `UNUSED_VAR (kmu_bus_if.kind)
     `UNUSED_VAR (kmu_bus_if.dest)
+    `UNUSED_VAR (kmu_bus_if.core_mask)
     `UNUSED_VAR (kmu_bus_if.eop)
 
     // A fragment is not a CTA: it carries only args.fragment, and the compute-descriptor
