@@ -16,7 +16,7 @@ TESTS := \
     dxa_copy dxa_copy_mcast dxa_kmajor_check                          \
     async_barrier async_gbarrier gbar_phase bar_slot_phase packld wgather wsync quad_lod \
     occupancy multikernel reopen module_reload single_cta            \
-    flush_coherence lazy_fetch sector_merge raw_order cache_ways chase \
+    flush_coherence lazy_fetch sector_merge raw_order cache_ways chase cache_side_channel \
     vm_test vm_fault vm_stress
 
 # --- common exclude list ---------------------------------------------

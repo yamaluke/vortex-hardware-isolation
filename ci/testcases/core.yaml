@@ -135,6 +135,15 @@ tests:
   shape:
     cores: 2
 
+# Prime+Probe across the static normal/secure CTA assignment and their shared L2.
+- id: parity-cache-side-channel
+  check: model_parity
+  via: blackbox
+  app: cache_side_channel
+  configs: -DVX_CFG_TWO_WORLD_ENABLE -DVX_CFG_SECURE_CORE_MASK=2 -DVX_CFG_L2_ENABLE -DVX_CFG_PLATFORM_MEMORY_LATENCY=64
+  shape:
+    cores: 2
+
 # ALU/LSU/branch streaming pipeline (~314k cycles on the default 1-core shape).
 - id: parity-vecadd
   check: model_parity
